@@ -1,0 +1,114 @@
+---
+title: "HTG Matching"
+author: "Bosco Hung"
+date: "2024-03-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+*read data and libraries*
+```{r message=FALSE, warning=FALSE}
+rm(list = ls()) # clear workspace
+setwd("~/Documents/HTG/Data Matching") # set working directory
+
+# Check system and installs packages user doesn't have, load needed packages
+
+#readxl: read data files
+need <- c("readxl", "dplyr") # list packages needed
+have <- need %in% rownames(installed.packages()) # checks packages you have
+if(any(!have)) install.packages(need[!have]) # install missing packages
+invisible(lapply(need, library, character.only=T)) # load needed packages
+
+df_school_database <- read_excel("School_response.xlsx")
+df_MFI_database <- read_excel("MFI_database.xlsx")
+df_Energy_database <- read_excel("Energy_database.xlsx")
+df_Info_database <- read_excel("Info.xlsx")
+df_school_matched <- df_school_database %>%
+  mutate(feasible = NA) %>%
+  mutate(panel_no = NA) %>%
+  mutate(panel_no_needed = NA) %>%
+  mutate(panel_total_cost = NA) %>%
+  mutate(loan_no = NA) %>%
+  mutate(loan_product = NA) %>%
+  mutate(loan_amount = NA) %>%
+  mutate(interest_per_year=NA) %>%
+  rowwise() %>%
+  mutate(min_electricity = min(c_across(Electricity_1:Electricity_12))) %>%
+  mutate(max_electricity = max(c_across(Electricity_1:Electricity_12))) 
+
+
+```
+
+*Validate*
+```{r message=FALSE, warning=FALSE}
+for (i in 1: nrow(df_school_matched)){
+  
+  
+  # check if feasible 
+  if (grepl(df_Energy_database$Region, ignore.case=TRUE, df_school_matched$Region[i]) & df_school_matched$Desired_additional_energy_needed[i] <= 80000 & df_school_matched$Min_Loan_needed[i] >= min(df_MFI_database$Min_amount,na.rm=TRUE)){
+  df_school_matched$feasible[i] = TRUE
+  } else{
+  df_school_matched$feasible[i] = FALSE
+  }
+  
+  if (df_school_matched$feasible[i]==TRUE){
+    # check the panels needed and the corresponding price
+    panel_no <- 0
+  panel_no_needed <- 0
+  panel_total_cost <- Inf
+  old_panel_total_cost <- Inf
+  for (j in 1:nrow(df_Energy_database)){
+    if (grepl(df_Energy_database$Region[j], ignore.case=TRUE, df_school_matched$Region[i])){
+      panel_no_needed_temp <- ceiling(df_school_matched$Desired_additional_energy_needed[i]/df_Energy_database$Energy_Production_per_year_kWh[j])
+      panel_total_cost <- min(panel_no_needed_temp*df_Energy_database$Cost_of_Panel[j], panel_total_cost,na.rm=TRUE)
+      if (panel_total_cost != old_panel_total_cost){
+        panel_no_needed <- panel_no_needed_temp
+        panel_no <- df_Energy_database$Product_no[j]
+      }
+
+    } 
+  }
+  df_school_matched$panel_no[i] <- panel_no
+  df_school_matched$panel_no_needed[i] <- panel_no_needed
+  df_school_matched$panel_total_cost[i] <- panel_total_cost
+  
+  # identify the optimal terms and conditions
+  loan_amount <- Inf
+  loan_no <- NA
+  interest_per_year <- Inf
+  old_interest_per_year <- Inf
+  for (k in 1:nrow(df_MFI_database)){
+    if (grepl(df_MFI_database$Region[k], ignore.case=TRUE, df_school_matched$Region[i])){
+      interest_per_year <- min(df_MFI_database$`Interest rate`[k]*min(df_school_matched$Min_Loan_needed[i], df_school_matched$panel_total_cost[i], na.rm=TRUE)/df_MFI_database$Repayment_period, interest_per_year,na.rm=TRUE)
+      if (interest_per_year != old_interest_per_year){
+        loan_amount <- min((df_MFI_database$`Interest rate`[k] + 1)*min(df_school_matched$Min_Loan_needed[i], df_school_matched$panel_total_cost[i], na.rm=TRUE)/df_MFI_database$Repayment_period, interest_per_year,na.rm=TRUE)
+        loan_no <- df_MFI_database$Product_no[k]
+        loan_product <- df_MFI_database$Product_name[k]
+      }
+
+    } 
+    
+  }
+  df_school_matched$loan_amount[i] <- loan_amount
+  df_school_matched$loan_no[i] <- loan_no
+  df_school_matched$loan_product[i] <- loan_product
+  df_school_matched$interest_per_year[i] <- interest_per_year
+  
+  
+  }
+  
+}
+
+write.csv(df_school_matched, "School Matched Database.csv")
+```
+
+*Output email*
+```{r message=FALSE, warning=FALSE}
+output_text <- NA
+
+```
