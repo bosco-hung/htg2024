@@ -109,6 +109,23 @@ write.csv(df_school_matched, "School Matched Database.csv")
 
 *Output email*
 ```{r message=FALSE, warning=FALSE}
-output_text <- NA
+
+# just for demonstration purposes; ignore the school names and figures
+
+output_text <- "Dear [Name] Team,\nThank you for reaching out to GreenEd via our website. We're excited about the potential to support your transition to renewable energy!\nTo get started on finding the ideal financing options and supplier information, we recommend scheduling a consultation call with our team. Please use this link to book a time that works best for you.\nOur initial assessment suggests an energy solution that costs [energy_cost] pounds and a financial solution that involves an annual interest payment of [interest] pounds.\nDuring our call, we can discuss: (1) PV Suppliers: We'll recommend options for suppliers based on the location of your institution; (2) Loan Schemes: We'll identify the most suitable financing programs for your project, helping you secure favourable terms; (3) GreenEd's Full Service: We'll explain how GreenEd can manage the entire process, from design and installation to ongoing system maintenance.\nWe look forward to helping you achieve your renewable energy goals!\nSincerely,\nGreenEd Management Team"
+
+output_text_fail <- "Dear [Name] Team,\nThank you for reaching out to GreenEd via our website. Unfortunately, after assessing your location, energy solutions, and financial needs, we are unable to identify a current solution that fulfills your needs.\nLet us know if you have any questions and we will reach out to you if we have a new solution.\nSincerely,\nGreenEd Management Team"
+
+for (i in 1:nrow(df_school_matched)){
+  if (df_school_matched$feasible[i] == FALSE){
+    output_text_fail_print <- gsub("\\[Name\\]", df_school_matched$`School name`[i], output_text_fail)
+    print(output_text_fail_print)
+  } else{
+    output_text_print <- gsub("\\[Name\\]", df_school_matched$`School name`, output_text)
+    output_text_print <- gsub("\\[energy_cost\\]", df_school_matched$panel_total_cost, output_text_print)
+    output_text_print <- gsub("\\[interest\\]", df_school_matched$interest_per_year[i], output_text_print)
+    print(output_text_print)
+  }
+}
 
 ```
